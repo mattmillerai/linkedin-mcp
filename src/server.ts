@@ -3,7 +3,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import express from 'express';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import { loadConfig } from './config.js';
-import { storedAccessToken, storedUserId, sharePost, shareLink, addComment, loadTokenData } from './linkedinApi.js';
+import { storedAccessToken, storedUserId, sharePost, shareLink, shareImage, uploadImage, addComment, loadTokenData } from './linkedinApi.js';
 import { z } from 'zod';
 
 console.error('▶ cwd:', process.cwd(), 'argv:', process.argv);
@@ -118,6 +118,60 @@ async function main() {
         return {
           isError: true,
           content: [{ type: 'text', text: `Failed to share link: ${error.message}` }],
+        };
+      }
+    }
+  );
+
+  server.tool(
+    'linkedin-share-image',
+    'Shares a post with a natively-uploaded image (from a URL). Image posts get better reach than body-link posts and show a visual — put any link in firstComment.',
+    {
+      text: z.string().min(1).describe('The post text.'),
+      imageUrl: z.string().url().describe('URL of the image to download and attach natively to the post.'),
+      imageAlt: z.string().optional().describe('Alt text for the image (accessibility).'),
+      firstComment: z
+        .string()
+        .optional()
+        .describe('Optional comment posted immediately on the new post — the recommended place for links.'),
+    },
+    async ({ text, imageUrl, imageAlt, firstComment }) => {
+      await loadTokenData();
+      if (!storedAccessToken || !storedUserId) {
+        return {
+          isError: true,
+          content: [
+            {
+              type: 'text',
+              text: `Authentication required. Please visit http://localhost:${config.authPort}/auth/linkedin in your browser.`,
+            },
+          ],
+        };
+      }
+      try {
+        const asset = await uploadImage(storedAccessToken, storedUserId, imageUrl);
+        const result = await shareImage(storedAccessToken, storedUserId, text, asset, imageAlt);
+        let commentNote = '';
+        if (firstComment && result.postId) {
+          try {
+            await addComment(storedAccessToken, storedUserId, result.postId, firstComment);
+            commentNote = ' First comment added.';
+          } catch (e: any) {
+            commentNote = ` (Post published, but the first comment failed: ${e.message})`;
+          }
+        }
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Image post shared successfully!${result.postId ? ` (Post ID: ${result.postId})` : ''}${commentNote}`,
+            },
+          ],
+        };
+      } catch (error: any) {
+        return {
+          isError: true,
+          content: [{ type: 'text', text: `Failed to share image post: ${error.message}` }],
         };
       }
     }

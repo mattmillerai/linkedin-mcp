@@ -112,7 +112,7 @@ Known constraints in the current implementation:
 - **Uses the legacy `/v2/ugcPosts` endpoint.** Still functional, but LinkedIn has deprecated it in
   favor of the versioned `/rest/posts` Posts API (requires a `LinkedIn-Version` header). Migration is
   a TODO — left as-is until it can be tested against a live developer app.
-- **No media uploads.** Text and link shares only; image/video assets are not implemented.
+- **Images yes, video no.** Native image upload is supported (`linkedin-share-image` / `image` in the post script); video assets are not implemented.
 - **Single-user token store.** Credentials are persisted to a local `tokenStore.json`; there is no
   multi-account support.
 
