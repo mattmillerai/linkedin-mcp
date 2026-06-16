@@ -158,6 +158,49 @@ export async function shareLink(
     return { success: true, postId: response.headers.get('x-restli-id') };
 }
 
+export async function addComment(
+    accessToken: string,
+    userId: string,
+    objectUrn: string,
+    text: string
+): Promise<{ success: boolean; commentId?: string | null }> {
+    if (Date.now() >= storedExpiresAt) {
+        console.error('Access token expired, refreshing...');
+        await refreshAccessToken();
+    }
+    const tokenToUse = storedAccessToken!;
+
+    const commentBody = {
+        actor: `urn:li:person:${userId}`,
+        object: objectUrn,
+        message: { text },
+    };
+
+    // The post URN must be URL-encoded into the path (e.g. urn:li:share:123 -> urn%3Ali%3Ashare%3A123).
+    const response = await fetch(
+        `https://api.linkedin.com/v2/socialActions/${encodeURIComponent(objectUrn)}/comments`,
+        {
+            method: 'POST',
+            headers: {
+                Authorization: `Bearer ${tokenToUse}`,
+                'Content-Type': 'application/json',
+                'X-Restli-Protocol-Version': '2.0.0',
+            },
+            body: JSON.stringify(commentBody),
+        }
+    );
+    if (!response.ok) {
+        const errorData = await response.text();
+        console.error('Add Comment Error:', response.status, errorData);
+        throw new Error(`Add comment failed: ${response.statusText} - ${errorData}`);
+    }
+    const data = (await response.json().catch(() => ({} as any))) as any;
+    return {
+        success: true,
+        commentId: data?.['$URN'] ?? data?.id ?? response.headers.get('x-restli-id'),
+    };
+}
+
 export async function refreshAccessToken(): Promise<void> {
     if (!storedRefreshToken) throw new Error('No refresh token available');
     const params = new URLSearchParams({
