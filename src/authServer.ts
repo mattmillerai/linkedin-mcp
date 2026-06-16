@@ -36,11 +36,20 @@ app.get('/auth/linkedin', (req, res) => {
 
 // 2. Callback endpoint
 app.get('/auth/linkedin/callback', async (req, res) => {
-  const { code, state } = req.query;
+  const { code, state, error, error_description } = req.query;
   // @ts-ignore
   const savedState = req.session.oauthState;
   // @ts-ignore
   delete req.session.oauthState;
+
+  // Surface errors LinkedIn returns via the redirect (e.g. unauthorized_scope_error,
+  // user_cancelled_login) instead of masking them as "Missing authorization code".
+  if (error) {
+    console.error('LinkedIn OAuth error:', error, '-', error_description);
+    return res
+      .status(400)
+      .send(`LinkedIn authorization failed: ${error} — ${error_description || '(no description)'}`);
+  }
 
   if (!code || typeof code !== 'string') {
     return res.status(400).send('Missing authorization code');
