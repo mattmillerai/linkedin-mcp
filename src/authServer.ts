@@ -1,5 +1,6 @@
 import express from 'express';
 import session from 'express-session';
+import { randomUUID } from 'crypto';
 import { loadConfig } from './config.js';
 import { exchangeCodeForToken, getUserInfo, storeTokenData } from './linkedinApi.js';
 
@@ -17,7 +18,7 @@ app.use(
 
 // 1. Initiate OAuth flow
 app.get('/auth/linkedin', (req, res) => {
-  const state = Math.random().toString(36).substring(2);
+  const state = randomUUID();
   // @ts-ignore
   req.session.oauthState = state;
 

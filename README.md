@@ -4,7 +4,7 @@ A Model Context Protocol (MCP) server using the TypeScript SDK for LinkedIn inte
 
 ## Prerequisites
 
-- Node.js (>=14) and npm
+- Node.js (>=18) and npm
 - LinkedIn Developer App:
   - Create an app at https://www.linkedin.com/developers/apps
   - Under "Products", add **Sign In with LinkedIn** (OpenID Connect) and **Share on LinkedIn**
@@ -77,7 +77,7 @@ Configure your `claude_desktop_config.json` file:
   "mcpServers": {
     "linkedin": {
       "command": "node",
-      "args": ["/Users/ken/Desktop/lab/linkedin-mcp/build/server.js"],
+      "args": ["/absolute/path/to/linkedin-mcp/build/server.js"],
       "transport": "http",
       "url": "http://localhost:8001",
       "sseEndpoint": "/stream",
@@ -98,3 +98,26 @@ Configure your `claude_desktop_config.json` file:
 (You can find this file from Claude Desktop by going to settings > developer > edit config)
 
 Save and **restart Claude Desktop** to apply changes.
+
+## Limitations & Roadmap
+
+Known constraints in the current implementation:
+
+- **Personal profile only.** Posts are authored as `urn:li:person:<id>` via the `w_member_social`
+  scope. Posting to an organization / company page requires the `w_organization_social` scope, a
+  `urn:li:organization:<id>` author, and access to LinkedIn's Community Management API (a separate,
+  heavier approval). Not yet supported.
+- **Immediate publish only.** Each tool call posts right away. There is no scheduling/queue — to run
+  scheduled "drops," wrap the MCP call in an external scheduler (cron, a GitHub Action, etc.).
+- **Uses the legacy `/v2/ugcPosts` endpoint.** Still functional, but LinkedIn has deprecated it in
+  favor of the versioned `/rest/posts` Posts API (requires a `LinkedIn-Version` header). Migration is
+  a TODO — left as-is until it can be tested against a live developer app.
+- **No media uploads.** Text and link shares only; image/video assets are not implemented.
+- **Single-user token store.** Credentials are persisted to a local `tokenStore.json`; there is no
+  multi-account support.
+
+### Refresh tokens
+
+The token refresh path (`refreshAccessToken`) requires your LinkedIn app to issue refresh tokens
+(enable "programmatic refresh tokens"). If your app only returns short-lived access tokens, you'll
+need to re-run the `/auth/linkedin` flow when the token expires.
