@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "MCP server for LinkedIn integration",
   "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "build": "tsc",
     "start": "node build/server.js",

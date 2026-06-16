@@ -123,9 +123,23 @@ async function main() {
     // Handle incoming POST JSON-RPC using SDK method
     await transport.handlePostMessage(req as any, res as any, req.body);
   });
-  app.listen(config.httpPort, () => {
-    console.error(`HTTP/SSE server listening on http://localhost:${config.httpPort}`);
-  });
+  app
+    .listen(config.httpPort, () => {
+      console.error(`HTTP/SSE server listening on http://localhost:${config.httpPort}`);
+    })
+    .on('error', (err: NodeJS.ErrnoException) => {
+      // The HTTP/SSE transport is optional; the primary transport is stdio.
+      // Don't let a busy port (e.g. the auth server already on this port)
+      // take down the whole MCP server.
+      if (err.code === 'EADDRINUSE') {
+        console.error(
+          `HTTP/SSE port ${config.httpPort} is already in use; continuing with stdio transport only. ` +
+            `Set HTTP_PORT to a free port to enable HTTP/SSE.`
+        );
+      } else {
+        console.error('HTTP/SSE server error:', err);
+      }
+    });
 } // close main()
 
 main();
