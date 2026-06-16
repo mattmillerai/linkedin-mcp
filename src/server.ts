@@ -3,7 +3,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import express from 'express';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import { loadConfig } from './config.js';
-import { storedAccessToken, storedUserId, sharePost, shareLink, loadTokenData } from './linkedinApi.js';
+import { storedAccessToken, storedUserId, sharePost, shareLink, addComment, loadTokenData } from './linkedinApi.js';
 import { z } from 'zod';
 
 console.error('▶ cwd:', process.cwd(), 'argv:', process.argv);
@@ -20,9 +20,17 @@ async function main() {
 
   server.tool(
     'linkedin-share-post',
-    'Shares a text post to LinkedIn.',
-    { text: z.string().min(1).describe('The content of the post to share.') },
-    async ({ text }) => {
+    'Shares a text post to LinkedIn. Optionally adds a first comment (the recommended place for links, which LinkedIn reach-penalizes in the post body).',
+    {
+      text: z.string().min(1).describe('The content of the post to share.'),
+      firstComment: z
+        .string()
+        .optional()
+        .describe(
+          'Optional comment posted immediately on the new post. Put links (blog URL, careers, etc.) here — links in the post body get reach-throttled.'
+        ),
+    },
+    async ({ text, firstComment }) => {
       await loadTokenData();
       if (!storedAccessToken || !storedUserId) {
         return {
@@ -37,11 +45,20 @@ async function main() {
       }
       try {
         const result = await sharePost(storedAccessToken, storedUserId, text);
+        let commentNote = '';
+        if (firstComment && result.postId) {
+          try {
+            await addComment(storedAccessToken, storedUserId, result.postId, firstComment);
+            commentNote = ' First comment added.';
+          } catch (e: any) {
+            commentNote = ` (Post published, but the first comment failed: ${e.message})`;
+          }
+        }
         return {
           content: [
             {
               type: 'text',
-              text: `Post shared successfully! ${result.postId ? `(Post ID: ${result.postId})` : ''}`,
+              text: `Post shared successfully!${result.postId ? ` (Post ID: ${result.postId})` : ''}${commentNote}`,
             },
           ],
         };
@@ -56,12 +73,16 @@ async function main() {
 
   server.tool(
     'linkedin-share-link',
-    'Shares a link with commentary to LinkedIn.',
+    'Shares a link with commentary to LinkedIn (renders a preview card). Note: a link in the post body is reach-throttled; for a blog share prefer linkedin-share-post with the link in firstComment. Optionally adds a first comment here too.',
     {
       text: z.string().min(1).describe('The commentary text to accompany the link.'),
       url: z.string().url().describe('The URL of the link to share.'),
+      firstComment: z
+        .string()
+        .optional()
+        .describe('Optional comment posted immediately on the new post.'),
     },
-    async ({ text, url }) => {
+    async ({ text, url, firstComment }) => {
       await loadTokenData();
       if (!storedAccessToken || !storedUserId) {
         return {
@@ -76,11 +97,20 @@ async function main() {
       }
       try {
         const result = await shareLink(storedAccessToken, storedUserId, text, url);
+        let commentNote = '';
+        if (firstComment && result.postId) {
+          try {
+            await addComment(storedAccessToken, storedUserId, result.postId, firstComment);
+            commentNote = ' First comment added.';
+          } catch (e: any) {
+            commentNote = ` (Post published, but the first comment failed: ${e.message})`;
+          }
+        }
         return {
           content: [
             {
               type: 'text',
-              text: `Link shared successfully! ${result.postId ? `(Post ID: ${result.postId})` : ''}`,
+              text: `Link shared successfully!${result.postId ? ` (Post ID: ${result.postId})` : ''}${commentNote}`,
             },
           ],
         };
@@ -88,6 +118,50 @@ async function main() {
         return {
           isError: true,
           content: [{ type: 'text', text: `Failed to share link: ${error.message}` }],
+        };
+      }
+    }
+  );
+
+  server.tool(
+    'linkedin-add-comment',
+    'Adds a comment to an existing LinkedIn post (by its URN).',
+    {
+      postUrn: z
+        .string()
+        .min(1)
+        .describe(
+          'The post URN to comment on, e.g. urn:li:share:123 or urn:li:ugcPost:123 (returned as "Post ID" when sharing).'
+        ),
+      text: z.string().min(1).describe('The comment text.'),
+    },
+    async ({ postUrn, text }) => {
+      await loadTokenData();
+      if (!storedAccessToken || !storedUserId) {
+        return {
+          isError: true,
+          content: [
+            {
+              type: 'text',
+              text: `Authentication required. Please visit http://localhost:${config.authPort}/auth/linkedin in your browser.`,
+            },
+          ],
+        };
+      }
+      try {
+        const result = await addComment(storedAccessToken, storedUserId, postUrn, text);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Comment added successfully!${result.commentId ? ` (Comment ID: ${result.commentId})` : ''}`,
+            },
+          ],
+        };
+      } catch (error: any) {
+        return {
+          isError: true,
+          content: [{ type: 'text', text: `Failed to add comment: ${error.message}` }],
         };
       }
     }

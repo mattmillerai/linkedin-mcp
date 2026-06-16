@@ -1,6 +1,6 @@
 # LinkedIn MCP Server
 
-A Model Context Protocol (MCP) server using the TypeScript SDK for LinkedIn integration. Allows an AI agent (e.g. Claude) to authenticate with LinkedIn and share posts or links.
+A Model Context Protocol (MCP) server using the TypeScript SDK for LinkedIn integration. Allows an AI agent (e.g. Claude) to authenticate with LinkedIn and share posts or links, and add comments — including a first comment posted automatically with a share (the recommended place for links, which LinkedIn reach-penalizes in the post body).
 
 ## Prerequisites
 
